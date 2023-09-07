@@ -123,7 +123,7 @@ def logout(request):
 class UserProfileView(generics.RetrieveAPIView):
     queryset = CustomUser.objects.all()
     serializer_class = CustomUserSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
     def retrieve(self, request, *args, **kwargs):
         # Get the user by their ID
@@ -242,7 +242,7 @@ class RecipeDetailsView(generics.RetrieveAPIView):
 class AddRecipeView(generics.CreateAPIView):
     queryset = Recipe.objects.all()
     serializer_class = AddRecipeSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsAuthenticated]
 
     def perform_create(self, serializer):
         # Create the recipe
@@ -345,6 +345,7 @@ class SearchByDescriptionView(generics.ListAPIView):
 
 class GiveFeedbackView(generics.CreateAPIView):
     serializer_class = CreateFeedbackSerializer
+    permission_classes = [IsAuthenticated]
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -378,3 +379,85 @@ class GiveFeedbackView(generics.CreateAPIView):
             {'detail': 'Feedback submitted successfully.'},
             status=status.HTTP_201_CREATED
         )
+    
+
+class UpdateRecipeView(generics.UpdateAPIView):
+    queryset = Recipe.objects.all()
+    serializer_class = AddRecipeSerializer  # Use the AddRecipeSerializer for updates
+    permission_classes = [IsAuthenticated]
+
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+
+        # Check if the user updating the recipe is the owner
+        if instance.user != request.user:
+            return Response({
+                'status': 'error',
+                'message': 'You do not have permission to edit this recipe.'
+            }, status=status.HTTP_403_FORBIDDEN)
+
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        if serializer.is_valid():
+            # Handle updating related ingredients
+            ingredients_data = request.data.get('ingredients', [])
+            for ingredient_data in ingredients_data:
+                ingredient_name = ingredient_data.get('name')
+                ingredient, created = Ingredient.objects.get_or_create(name=ingredient_name)
+                quantity = ingredient_data.get('quantity')
+                RecipeIngredient.objects.update_or_create(
+                    recipe=instance,
+                    ingredient=ingredient,
+                    defaults={'quantity': quantity}
+                )
+
+            # Handle updating the recipe type
+            recipe_type_data = request.data.get('recipe_type', {})
+            type_name = recipe_type_data.get('name')
+            recipe_type, created = Type.objects.get_or_create(name=type_name)
+            instance.recipe_types.set([recipe_type])
+
+            # Handle updating recipe steps along with images
+            steps_data = request.data.get('steps', [])
+            for step_data in steps_data:
+                step_serializer = RecipeStepSerializer(data=step_data)
+                if step_serializer.is_valid():
+                    step = step_serializer.save(recipe=instance)
+
+                    # Handle updating step images
+                    step_images_data = step_data.get('step_images', [])
+                    for image_data in step_images_data:
+                        image_serializer = ImageSerializer(data=image_data)
+                        if image_serializer.is_valid():
+                            image = image_serializer.save()
+                            StepImage.objects.update_or_create(
+                                step=step,
+                                image=image,
+                                defaults={'serial_no': image_data.get('serial_no')}
+                            )
+
+            self.perform_update(serializer)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+    
+class RecipeDeleteView(generics.DestroyAPIView):
+    queryset = Recipe.objects.all()
+    permission_classes = [IsAuthenticated]
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+
+        # Check if the user requesting the deletion is the owner of the recipe
+        if instance.user != request.user:
+            return Response({
+                'status': 'error',
+                'message': 'You do not have permission to delete this recipe.'
+            }, status=status.HTTP_403_FORBIDDEN)
+
+        instance.delete()
+        
+        return Response({
+            'status': 'success',
+            'message': 'Recipe deleted successfully.'
+        }, status=status.HTTP_204_NO_CONTENT)

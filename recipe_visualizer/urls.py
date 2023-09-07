@@ -17,6 +17,8 @@ urlpatterns = [
     path('recipes/search_by_description/', views.SearchByDescriptionView.as_view(), name='search_by_description'),
     path('recipes/<int:recipe_id>/feedback/', views.GiveFeedbackView.as_view(), name='give_feedback'),
     path('logout/', views.logout, name='logout'),
+    path('recipes/<int:pk>/update/', views.UpdateRecipeView.as_view(), name='recipe-update'),
+    path('recipes/<int:pk>/delete/', views.RecipeDeleteView.as_view(), name='recipe-delete'),
 ]
 
 if settings.DEBUG:
