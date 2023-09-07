@@ -2,9 +2,9 @@ from django.contrib.auth import get_user_model
 from rest_framework import generics, permissions, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.authtoken.models import Token
 from rest_framework.response import Response
 from django.contrib.auth.hashers import make_password,check_password
-from rest_framework.authtoken.models import Token
 from django.contrib.auth import authenticate
 from django.contrib.auth import login as django_login, logout as django_logout
 from django.shortcuts import get_object_or_404
@@ -12,6 +12,7 @@ from django.db.models import Q
 from fuzzywuzzy import fuzz
 from django.utils import timezone
 from decimal import Decimal
+from rest_framework.exceptions import ValidationError
 
 
 from .models import (
@@ -45,49 +46,68 @@ from .serializers import (
     SearchSerializer,
     FeedbackSerializer,
     RecipeIngredientSerializer,
+    RecipeListSerializer,
+    LoginSerializer,
+    SignupSerializer,
+    CreateFeedbackSerializer,
+    AddRecipeSerializer,
+    UpdateUserSerializer,
+    UpdatePasswordSerializer,
 )
 
 class HomePageView(generics.ListAPIView):
     queryset = Recipe.objects.filter(is_feature=True)
-    serializer_class = RecipeSerializer
+    serializer_class = RecipeListSerializer
 
     def list(self, request):
         queryset = self.get_queryset()
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
 
+
 class SignupView(generics.CreateAPIView):
     queryset = get_user_model().objects.all()
-    serializer_class = CustomUserSerializer
+    serializer_class = SignupSerializer
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        user_data = serializer.validated_data
-        password = user_data.pop('password')
-        user_data['password'] = make_password(password)
-        self.perform_create(serializer)
+        # Check if the username is already taken
+        username = serializer.validated_data['username']
+        if get_user_model().objects.filter(username=username).exists():
+            return Response({'error': 'Username is already taken.'}, status=status.HTTP_400_BAD_REQUEST)
 
+        # Check if the email is already taken
+        email = serializer.validated_data['email']
+        if get_user_model().objects.filter(email=email).exists():
+            return Response({'error': 'Email is already taken.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        self.perform_create(serializer)
         headers = self.get_success_headers(serializer.data)
         return Response({'user_id': serializer.instance.id}, status=status.HTTP_201_CREATED, headers=headers)
 
 
 class LoginView(generics.GenericAPIView):
-    serializer_class = CustomUserSerializer
+    serializer_class = LoginSerializer
 
     def post(self, request, *args, **kwargs):
-        username = request.data.get('username')
-        password = request.data.get('password')
+        serializer = self.serializer_class(data=request.data)
 
-        user = authenticate(username=username, password=password)
+        if serializer.is_valid():
+            username = serializer.validated_data['username']
+            password = serializer.validated_data['password']
 
-        if user is not None:
-            django_login(request, user)
-            token, created = Token.objects.get_or_create(user=user)
-            return Response({'token': token.key}, status=status.HTTP_200_OK)
-        else:
-            return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
+            user = get_user_model().objects.filter(username=username).first()
+
+            if user is not None and check_password(password, user.password):
+                # Password matches, log in the user
+                django_login(request, user)
+                return Response({'user': CustomUserSerializer(user).data}, status=status.HTTP_200_OK)
+            else:
+                return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -109,12 +129,13 @@ class UserProfileView(generics.RetrieveAPIView):
 
         # Calculate user's points based on the weighted sum
         user_points = Decimal(len(user_recipes) *2)
-        total_recipe_rating = Decimal(0)
-        # Calculate the weighted sum of recipe ratings
-        for recipe in user_recipes:
-            total_recipe_rating += Decimal(recipe.rating)
-            
-        user_points += (total_recipe_rating/len(user_recipes)) * Decimal(3)
+        if len(user_recipes)>0:
+            total_recipe_rating = Decimal(0)
+            # Calculate the weighted sum of recipe ratings
+            for recipe in user_recipes:
+                total_recipe_rating += Decimal(recipe.rating)
+                
+            user_points += (total_recipe_rating/len(user_recipes)) * Decimal(3)
 
         # Calculate the weighted sum based on user registration date
         current_date = timezone.now()
@@ -131,7 +152,7 @@ class UserProfileView(generics.RetrieveAPIView):
         serializer = self.get_serializer(user)
 
         # Serialize user's added recipes
-        recipe_serializer = RecipeSerializer(user_recipes, many=True)
+        recipe_serializer = RecipeListSerializer(user_recipes, many=True)
 
         # Create a response with both user data and user's added recipes
         response_data = serializer.data
@@ -139,71 +160,57 @@ class UserProfileView(generics.RetrieveAPIView):
 
         return Response(response_data, status=status.HTTP_200_OK)
 
+
 class UpdatePasswordView(generics.UpdateAPIView):
-    queryset = get_user_model().objects.all()
+    serializer_class = UpdatePasswordSerializer
     permission_classes = [IsAuthenticated]
 
     def update(self, request, *args, **kwargs):
-        user_id = kwargs.get('user_id')  # Get the user_id from URL
+        serializer = self.get_serializer(data=request.data)
         try:
-            user = get_user_model().objects.get(pk=user_id)
-        except get_user_model().DoesNotExist:
-            return Response({'message': 'User not found.'}, status=404)
+            serializer.is_valid(raise_exception=True)
+        except ValidationError as e:
+            return Response({
+                'status': 'error',
+                'message': 'Validation error',
+                'errors': e.detail
+            }, status=status.HTTP_400_BAD_REQUEST)
 
-        # Ensure the user making the request is the same as the user being updated
-        if request.user != user:
-            return Response({'message': 'Permission denied.'}, status=403)
-        
-
-        current_password = request.data.get('current_password', None)
-        new_password = request.data.get('new_password', None)
-        
-        if not current_password or not new_password:
-            return Response(
-                {'message': 'Both current and new password are required.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        if not check_password(current_password, user.password):
-            return Response(
-                {'message': 'Current password is incorrect.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
+        # Update the user's password
+        user = self.request.user
+        new_password = serializer.validated_data['new_password']
         user.set_password(new_password)
         user.save()
 
-        return Response({'message': 'Password updated successfully.'}, status=status.HTTP_200_OK)
+        return Response({
+            'status': 'success',
+            'message': 'Password updated successfully',
+        }, status=status.HTTP_200_OK)
 
 
 class UpdateProfileView(generics.UpdateAPIView):
-    queryset = CustomUser.objects.all()
-    serializer_class = CustomUserSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = UpdateUserSerializer
+    permission_classes = [IsAuthenticated]
 
-    def update(self, request, user_id, *args, **kwargs):
-        instance = get_object_or_404(self.queryset, pk=user_id)
 
-        # Check if the request user is the owner of the profile
-        if request.user.id != user_id:
-            return Response({
-                'status': 'error',
-                'message': 'You do not have permission to update this profile.'
-            }, status=status.HTTP_403_FORBIDDEN)
-
-        serializer = self.get_serializer(instance, data=request.data, partial=True)
+    def update(self, request, *args, **kwargs):
+        print(request.data)
+        instance = self.request.user
+        partial = kwargs.pop('partial', False)
+        
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
-        serializer.save()
-
+        serializer.save()  # Save the updated information
         return Response({
             'status': 'success',
             'message': 'User profile updated successfully',
             'data': serializer.data
         }, status=status.HTTP_200_OK)
+    
 
 class RecipeListView(generics.ListAPIView):
     queryset = Recipe.objects.all()
-    serializer_class = RecipeSerializer
+    serializer_class = RecipeListSerializer
 
     
     def list(self, request):
@@ -221,56 +228,15 @@ class RecipeDetailsView(generics.RetrieveAPIView):
         # Get the recipe by its ID
         recipe = self.get_object()
 
-        # Get feedback for the recipe
-        feedback = Feedback.objects.filter(recipe=recipe)
-
-        # Get ingredients of the recipe
-        ingredients = RecipeIngredient.objects.filter(recipe=recipe)
-
-        # Get steps of the recipe
-        steps = RecipeStep.objects.filter(recipe=recipe)
-
-        # Get type of the recipe
-        recipe_type = Type.objects.filter(recipetype__recipe=recipe)
-
-        # Get step images for each step
-        step_images = StepImage.objects.filter(step__recipe=recipe)
-
-        # Get recipe owner (CustomUser) details
-        owner = recipe.user
-
         # Serialize recipe data
         serializer = self.get_serializer(recipe)
-
-
-
-        # Serialize feedback, ingredients, steps, type, and step images
-        feedback_serializer = FeedbackSerializer(feedback, many=True)
-        ingredients_serializer = RecipeIngredientSerializer(ingredients, many=True)
-        steps_serializer = RecipeStepSerializer(steps, many=True)
-        recipe_type_serializer = TypeSerializer(recipe_type, many=True)
-        step_images_serializer = StepImageSerializer(step_images, many=True)
-        owner_serializer = CustomUserSerializer(owner)
-
-        # Create a response with all the data
-        response_data = serializer.data
-        response_data['feedback'] = feedback_serializer.data
-        response_data['ingredients'] = ingredients_serializer.data
-        response_data['steps'] = steps_serializer.data
-        response_data['recipe_types'] = recipe_type_serializer.data
-        response_data['owner'] = owner_serializer.data
-
-        # Include step images inside corresponding steps
-        for step_data in response_data['steps']:
-            step_data['step_images'] = [img for img in step_images_serializer.data if img['step'] == step_data['id']]
-
-        return Response(response_data, status=status.HTTP_200_OK) 
+        return Response(serializer.data, status=status.HTTP_200_OK) 
 
 
 
 class AddRecipeView(generics.CreateAPIView):
     queryset = Recipe.objects.all()
-    serializer_class = RecipeSerializer
+    serializer_class = AddRecipeSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def perform_create(self, serializer):
@@ -316,26 +282,20 @@ class AddRecipeView(generics.CreateAPIView):
 
 
 class SearchByIngredientsView(generics.ListAPIView):
-    serializer_class = RecipeSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = RecipeListSerializer
 
     def get_queryset(self):
-        ingredient_names = self.request.query_params.getlist('ingredient')
+        print(self.request.data)
+        ingredient_names = self.request.data["ingredients"]
+        print(ingredient_names)
         queryset = Recipe.objects.filter(is_valid=True)
 
-        # Create a list of Q objects for ingredient name filtering
-        ingredient_filters = [Q(recipeingredient__ingredient__name=ingredient) for ingredient in ingredient_names]
-
-        # Combine the Q objects with OR operator
-        if ingredient_filters:
-            query = ingredient_filters.pop()
-            for item in ingredient_filters:
-                query |= item
-
-            # Filter recipes based on ingredients
-            queryset = queryset.filter(query)
-
-        return queryset
+        for ingredient in ingredient_names:
+            queryset = queryset.filter(
+                Q(ingredients__ingredient__name__icontains=ingredient) |
+                Q(ingredients__ingredient__description__icontains=ingredient)
+            )
+        return queryset.distinct()
 
     def list(self, request, *args, **kwargs):
         queryset = self.get_queryset()
@@ -344,29 +304,30 @@ class SearchByIngredientsView(generics.ListAPIView):
 
 
 class SearchByDescriptionView(generics.ListAPIView):
-    serializer_class = RecipeSerializer
+    serializer_class = RecipeListSerializer
 
     def get_queryset(self):
-        description = self.request.query_params.get('description', '')
-
+        description = self.request.data['description']
+        print(description)
         # Filter recipes based on a similarity threshold
         queryset = Recipe.objects.filter(
             is_valid=True,
             description__isnull=False,
         ).filter(
+            Q(title__icontains=description) |
             Q(description__icontains=description) |
             Q(description__isnull=False, description__icontains=description)
         ).order_by('-id')
-
+        print(queryset)
         # Use fuzzywuzzy's fuzz.partial_ratio to compare descriptions
-        matching_recipes = []
-        for recipe in queryset:
-            similarity = fuzz.partial_ratio(description.lower(), recipe.description.lower())
-            # You can adjust the threshold (e.g., 80) as needed
-            if similarity >= 60:
-                matching_recipes.append(recipe)
+        # matching_recipes = []
+        # for recipe in queryset:
+        #     similarity = fuzz.partial_ratio(description.lower(), recipe.description.lower())
+        #     # You can adjust the threshold (e.g., 80) as needed
+        #     if similarity >= 60:
+        #         matching_recipes.append(recipe)
 
-        return matching_recipes
+        return queryset.distinct()
 
     def list(self, request, *args, **kwargs):
         queryset = self.get_queryset()
@@ -374,7 +335,7 @@ class SearchByDescriptionView(generics.ListAPIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 class GiveFeedbackView(generics.CreateAPIView):
-    serializer_class = FeedbackSerializer
+    serializer_class = CreateFeedbackSerializer
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
