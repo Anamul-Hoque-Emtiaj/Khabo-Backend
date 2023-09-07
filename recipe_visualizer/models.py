@@ -7,10 +7,15 @@ class CustomUser(AbstractUser):
     image_path = models.ImageField(upload_to='user_images/',null=True, default=None)
     points = models.DecimalField(default=0,decimal_places=2,max_digits=10)
     registration_date = models.DateTimeField(auto_now_add=True)
+    def __str__(self):
+        return self.get_full_name()
 
 class Category(models.Model):  # Category of Ingredient
     name = models.CharField(max_length=100)
     details = models.TextField()
+
+    def __str__(self):
+        return self.name
 
 
 
@@ -18,10 +23,16 @@ class Brand(models.Model): # Brand of Ingredient
     name = models.CharField(max_length=100)
     details = models.TextField()
 
+    def __str__(self):
+        return self.name
+
 class Ingredient(models.Model):
     brand = models.ForeignKey(Brand, on_delete=models.CASCADE, null=True, default=None)
     name = models.CharField(max_length=100)
     description = models.TextField()
+
+    def __str__(self):
+        return self.name
 
 class IngredientCategory(models.Model):
     ingredient = models.ForeignKey(Ingredient, on_delete=models.CASCADE)
@@ -30,6 +41,9 @@ class IngredientCategory(models.Model):
 class Type(models.Model): # Type of Recipe
     name = models.CharField(max_length=100)
     details = models.TextField()
+
+    def __str__(self):
+        return self.name
 
 class Recipe(models.Model):
     user = models.ForeignKey(get_user_model(), on_delete=models.CASCADE)
@@ -40,6 +54,9 @@ class Recipe(models.Model):
     is_valid = models.BooleanField(default=True)
     is_feature = models.BooleanField(default=True)
     rating = models.DecimalField(max_digits=3, decimal_places=2, default=0)
+
+    def __str__(self):
+        return self.title
 
 class RecipeType(models.Model):
     recipe = models.ForeignKey(Recipe, on_delete=models.CASCADE)
@@ -53,6 +70,7 @@ class RecipeStep(models.Model):
     recipe = models.ForeignKey(Recipe, on_delete=models.CASCADE)
     step_no = models.IntegerField()
     descriptions = models.TextField()
+
 
 class StepImage(models.Model):
     step = models.ForeignKey(RecipeStep, on_delete=models.CASCADE)

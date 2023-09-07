@@ -11,6 +11,7 @@ from django.shortcuts import get_object_or_404
 from django.db.models import Q
 from fuzzywuzzy import fuzz
 from django.utils import timezone
+from decimal import Decimal
 
 
 from .models import (
@@ -107,20 +108,20 @@ class UserProfileView(generics.RetrieveAPIView):
         user_recipes = Recipe.objects.filter(user=user)
 
         # Calculate user's points based on the weighted sum
-        user_points = len(user_recipes) *2
-        total_recipe_rating = 0
+        user_points = Decimal(len(user_recipes) *2)
+        total_recipe_rating = Decimal(0)
         # Calculate the weighted sum of recipe ratings
         for recipe in user_recipes:
-            total_recipe_rating += recipe.rating
+            total_recipe_rating += Decimal(recipe.rating)
             
-        user_points += total_recipe_rating * 3
+        user_points += (total_recipe_rating/len(user_recipes)) * Decimal(3)
 
         # Calculate the weighted sum based on user registration date
         current_date = timezone.now()
         registration_date = user.registration_date
         days_since_registration = (current_date - registration_date).days
 
-        user_points += days_since_registration * 0.1
+        user_points += days_since_registration * Decimal(0.1)
 
         # Update the user's points and save
         user.points = user_points
@@ -214,7 +215,7 @@ class RecipeListView(generics.ListAPIView):
 class RecipeDetailsView(generics.RetrieveAPIView):
     queryset = Recipe.objects.all()
     serializer_class = RecipeSerializer
-
+    
 
     def retrieve(self, request, *args, **kwargs):
         # Get the recipe by its ID
