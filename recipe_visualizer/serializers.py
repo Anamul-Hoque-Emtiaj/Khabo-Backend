@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import CustomUser, Category, IngredientCategory, Brand, Ingredient, Type, Recipe, RecipeType, Image, RecipeStep, StepImage, UserRecipe, Search, Feedback, RecipeIngredient
+from .models import CustomUser, Category, IngredientCategory, Brand, Ingredient, Type, Recipe, RecipeType, Image, RecipeStep, StepImage, Search, Feedback, RecipeIngredient
 
 class CustomUserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -54,11 +54,6 @@ class RecipeStepSerializer(serializers.ModelSerializer):
 class StepImageSerializer(serializers.ModelSerializer):
     class Meta:
         model = StepImage
-        fields = '__all__'
-
-class UserRecipeSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = UserRecipe
         fields = '__all__'
 
 class SearchSerializer(serializers.ModelSerializer):
