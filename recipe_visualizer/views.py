@@ -13,6 +13,7 @@ from fuzzywuzzy import fuzz
 from django.utils import timezone
 from decimal import Decimal
 from rest_framework.exceptions import ValidationError
+from drf_spectacular.utils import extend_schema
 
 
 from .models import (
@@ -53,6 +54,9 @@ from .serializers import (
     AddRecipeSerializer,
     UpdateUserSerializer,
     UpdatePasswordSerializer,
+    UserProfilesSerializer,
+    SearchByDescriptionSerializer,
+    SearchByIngredientsSerializer,
 )
 
 class HomePageView(generics.ListAPIView):
@@ -115,6 +119,7 @@ def logout(request):
     django_logout(request)
     return Response({'message': 'Logged out successfully'}, status=status.HTTP_200_OK)
 
+@extend_schema(responses=UserProfilesSerializer)
 class UserProfileView(generics.RetrieveAPIView):
     queryset = CustomUser.objects.all()
     serializer_class = CustomUserSerializer
@@ -280,7 +285,7 @@ class AddRecipeView(generics.CreateAPIView):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-
+@extend_schema(request=SearchByIngredientsSerializer,responses=RecipeListSerializer)
 class SearchByIngredientsView(generics.ListAPIView):
     serializer_class = RecipeListSerializer
 
@@ -301,8 +306,10 @@ class SearchByIngredientsView(generics.ListAPIView):
         queryset = self.get_queryset()
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+    def post(self, request, *args, **kwargs):
+        return self.list(request, *args, **kwargs)
 
-
+@extend_schema(request=SearchByDescriptionSerializer,responses=RecipeListSerializer)
 class SearchByDescriptionView(generics.ListAPIView):
     serializer_class = RecipeListSerializer
 
@@ -333,6 +340,8 @@ class SearchByDescriptionView(generics.ListAPIView):
         queryset = self.get_queryset()
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+    def post(self, request, *args, **kwargs):
+        return self.list(request, *args, **kwargs)
 
 class GiveFeedbackView(generics.CreateAPIView):
     serializer_class = CreateFeedbackSerializer

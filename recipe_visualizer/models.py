@@ -71,7 +71,7 @@ class Type(models.Model): # Type of Recipe
         return self.name
 
 class Recipe(models.Model):
-    user = models.ForeignKey(get_user_model(), on_delete=models.CASCADE)
+    user = models.ForeignKey(get_user_model(), on_delete=models.CASCADE, related_name='recipes')
     recipe_image = models.ImageField(upload_to='recipe_images/',null=True)
     title = models.CharField(max_length=200)
     description = models.TextField()

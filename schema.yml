@@ -1,0 +1,987 @@
+openapi: 3.0.3
+info:
+  title: Khabo API
+  version: 0.0.0
+paths:
+  /:
+    get:
+      operationId: root_list
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RecipeList'
+          description: ''
+  /api/schema/:
+    get:
+      operationId: api_schema_retrieve
+      description: |-
+        OpenApi3 schema for this API. Format can be selected via content negotiation.
+
+        - YAML: application/vnd.oai.openapi
+        - JSON: application/vnd.oai.openapi+json
+      parameters:
+      - in: query
+        name: format
+        schema:
+          type: string
+          enum:
+          - json
+          - yaml
+      - in: query
+        name: lang
+        schema:
+          type: string
+          enum:
+          - af
+          - ar
+          - ar-dz
+          - ast
+          - az
+          - be
+          - bg
+          - bn
+          - br
+          - bs
+          - ca
+          - ckb
+          - cs
+          - cy
+          - da
+          - de
+          - dsb
+          - el
+          - en
+          - en-au
+          - en-gb
+          - eo
+          - es
+          - es-ar
+          - es-co
+          - es-mx
+          - es-ni
+          - es-ve
+          - et
+          - eu
+          - fa
+          - fi
+          - fr
+          - fy
+          - ga
+          - gd
+          - gl
+          - he
+          - hi
+          - hr
+          - hsb
+          - hu
+          - hy
+          - ia
+          - id
+          - ig
+          - io
+          - is
+          - it
+          - ja
+          - ka
+          - kab
+          - kk
+          - km
+          - kn
+          - ko
+          - ky
+          - lb
+          - lt
+          - lv
+          - mk
+          - ml
+          - mn
+          - mr
+          - ms
+          - my
+          - nb
+          - ne
+          - nl
+          - nn
+          - os
+          - pa
+          - pl
+          - pt
+          - pt-br
+          - ro
+          - ru
+          - sk
+          - sl
+          - sq
+          - sr
+          - sr-latn
+          - sv
+          - sw
+          - ta
+          - te
+          - tg
+          - th
+          - tk
+          - tr
+          - tt
+          - udm
+          - uk
+          - ur
+          - uz
+          - vi
+          - zh-hans
+          - zh-hant
+      tags:
+      - api
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/vnd.oai.openapi:
+              schema:
+                type: object
+                additionalProperties: {}
+            application/yaml:
+              schema:
+                type: object
+                additionalProperties: {}
+            application/vnd.oai.openapi+json:
+              schema:
+                type: object
+                additionalProperties: {}
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+  /login/:
+    post:
+      operationId: login_create
+      tags:
+      - login
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Login'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Login'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Login'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Login'
+          description: ''
+  /logout/:
+    post:
+      operationId: logout_create
+      tags:
+      - logout
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          description: No response body
+  /profile/{id}/:
+    get:
+      operationId: profile_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - profile
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfiles'
+          description: ''
+  /profile/update/:
+    put:
+      operationId: profile_update_update
+      tags:
+      - profile
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUser'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UpdateUser'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UpdateUser'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdateUser'
+          description: ''
+    patch:
+      operationId: profile_update_partial_update
+      tags:
+      - profile
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateUser'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateUser'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdateUser'
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdateUser'
+          description: ''
+  /profile/update_password/:
+    put:
+      operationId: profile_update_password_update
+      tags:
+      - profile
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePassword'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UpdatePassword'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UpdatePassword'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdatePassword'
+          description: ''
+    patch:
+      operationId: profile_update_password_partial_update
+      tags:
+      - profile
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdatePassword'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdatePassword'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUpdatePassword'
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdatePassword'
+          description: ''
+  /recipes/:
+    get:
+      operationId: recipes_list
+      tags:
+      - recipes
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RecipeList'
+          description: ''
+  /recipes/{id}/:
+    get:
+      operationId: recipes_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - recipes
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Recipe'
+          description: ''
+  /recipes/{recipe_id}/feedback/:
+    post:
+      operationId: recipes_feedback_create
+      parameters:
+      - in: path
+        name: recipe_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - recipes
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateFeedback'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CreateFeedback'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreateFeedback'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateFeedback'
+          description: ''
+  /recipes/add/:
+    post:
+      operationId: recipes_add_create
+      tags:
+      - recipes
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddRecipe'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AddRecipe'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AddRecipe'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AddRecipe'
+          description: ''
+  /recipes/search_by_description/:
+    get:
+      operationId: recipes_search_by_description_list
+      tags:
+      - recipes
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RecipeList'
+          description: ''
+  /recipes/search_by_ingredients/:
+    get:
+      operationId: recipes_search_by_ingredients_list
+      tags:
+      - recipes
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RecipeList'
+          description: ''
+  /signup/:
+    post:
+      operationId: signup_create
+      tags:
+      - signup
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Signup'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Signup'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Signup'
+        required: true
+      security:
+      - cookieAuth: []
+      - basicAuth: []
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Signup'
+          description: ''
+components:
+  schemas:
+    AddRecipe:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        recipe_image:
+          type: string
+          format: uri
+          nullable: true
+        title:
+          type: string
+          maxLength: 200
+        description:
+          type: string
+        making_time:
+          type: string
+          maxLength: 50
+        ingredients:
+          type: array
+          items:
+            $ref: '#/components/schemas/RecipeIngredient'
+        steps:
+          type: array
+          items:
+            $ref: '#/components/schemas/RecipeStep'
+        recipe_types:
+          type: array
+          items:
+            $ref: '#/components/schemas/RecipeType'
+      required:
+      - description
+      - id
+      - ingredients
+      - making_time
+      - recipe_types
+      - steps
+      - title
+    Brand:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 100
+        details:
+          type: string
+      required:
+      - details
+      - id
+      - name
+    CreateFeedback:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        rating:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,1}(?:\.\d{0,2})?$
+        review_text:
+          type: string
+      required:
+      - id
+      - rating
+      - review_text
+    CustomUser:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        username:
+          type: string
+          description: Required. 150 characters or fewer. Letters, digits and @/./+/-/_
+            only.
+          pattern: ^[\w.@+-]+$
+          maxLength: 150
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        first_name:
+          type: string
+          maxLength: 150
+        last_name:
+          type: string
+          maxLength: 150
+        image_path:
+          type: string
+          format: uri
+          nullable: true
+        points:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+        registration_date:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - email
+      - id
+      - registration_date
+      - username
+    Feedback:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        rating:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,1}(?:\.\d{0,2})?$
+        review_text:
+          type: string
+        user:
+          $ref: '#/components/schemas/CustomUser'
+      required:
+      - id
+      - rating
+      - review_text
+      - user
+    Image:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        image_path:
+          type: string
+          format: uri
+        descriptions:
+          type: string
+      required:
+      - descriptions
+      - id
+      - image_path
+    Ingredient:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 100
+        description:
+          type: string
+        brand:
+          $ref: '#/components/schemas/Brand'
+      required:
+      - brand
+      - description
+      - id
+      - name
+    Login:
+      type: object
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+          writeOnly: true
+      required:
+      - password
+      - username
+    PatchedUpdatePassword:
+      type: object
+      properties:
+        current_password:
+          type: string
+          writeOnly: true
+        new_password:
+          type: string
+          writeOnly: true
+        confirm_new_password:
+          type: string
+          writeOnly: true
+    PatchedUpdateUser:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        first_name:
+          type: string
+          maxLength: 150
+        last_name:
+          type: string
+          maxLength: 150
+        image_path:
+          type: string
+          format: uri
+          nullable: true
+    Recipe:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        recipe_image:
+          type: string
+          format: uri
+          nullable: true
+        title:
+          type: string
+          maxLength: 200
+        description:
+          type: string
+        making_time:
+          type: string
+          maxLength: 50
+        is_valid:
+          type: boolean
+        is_feature:
+          type: boolean
+        rating:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,1}(?:\.\d{0,2})?$
+        user:
+          $ref: '#/components/schemas/CustomUser'
+        feedback:
+          type: array
+          items:
+            $ref: '#/components/schemas/Feedback'
+        ingredients:
+          type: array
+          items:
+            $ref: '#/components/schemas/RecipeIngredient'
+        steps:
+          type: array
+          items:
+            $ref: '#/components/schemas/RecipeStep'
+        recipe_types:
+          type: array
+          items:
+            $ref: '#/components/schemas/RecipeType'
+      required:
+      - description
+      - feedback
+      - id
+      - ingredients
+      - making_time
+      - recipe_types
+      - steps
+      - title
+      - user
+    RecipeIngredient:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        ingredient:
+          $ref: '#/components/schemas/Ingredient'
+        quantity:
+          type: string
+          maxLength: 50
+      required:
+      - id
+      - ingredient
+      - quantity
+    RecipeList:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        recipe_image:
+          type: string
+          format: uri
+          nullable: true
+        title:
+          type: string
+          maxLength: 200
+        description:
+          type: string
+        making_time:
+          type: string
+          maxLength: 50
+        is_valid:
+          type: boolean
+        is_feature:
+          type: boolean
+        rating:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,1}(?:\.\d{0,2})?$
+        user:
+          $ref: '#/components/schemas/CustomUser'
+      required:
+      - description
+      - id
+      - making_time
+      - title
+      - user
+    RecipeStep:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        step_no:
+          type: integer
+        descriptions:
+          type: string
+        step_images:
+          type: array
+          items:
+            $ref: '#/components/schemas/StepImage'
+      required:
+      - descriptions
+      - id
+      - step_images
+      - step_no
+    RecipeType:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        type:
+          $ref: '#/components/schemas/Type'
+      required:
+      - id
+      - type
+    Signup:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        username:
+          type: string
+          description: Required. 150 characters or fewer. Letters, digits and @/./+/-/_
+            only.
+          pattern: ^[\w.@+-]+$
+          maxLength: 150
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        password:
+          type: string
+          writeOnly: true
+        password_confirmation:
+          type: string
+          writeOnly: true
+        first_name:
+          type: string
+          maxLength: 150
+        last_name:
+          type: string
+          maxLength: 150
+      required:
+      - email
+      - id
+      - password
+      - password_confirmation
+      - username
+    StepImage:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        serial_no:
+          type: integer
+        image:
+          $ref: '#/components/schemas/Image'
+      required:
+      - id
+      - image
+      - serial_no
+    Type:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        name:
+          type: string
+          maxLength: 100
+        details:
+          type: string
+      required:
+      - details
+      - id
+      - name
+    UpdatePassword:
+      type: object
+      properties:
+        current_password:
+          type: string
+          writeOnly: true
+        new_password:
+          type: string
+          writeOnly: true
+        confirm_new_password:
+          type: string
+          writeOnly: true
+      required:
+      - confirm_new_password
+      - current_password
+      - new_password
+    UpdateUser:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        first_name:
+          type: string
+          maxLength: 150
+        last_name:
+          type: string
+          maxLength: 150
+        image_path:
+          type: string
+          format: uri
+          nullable: true
+      required:
+      - email
+      - id
+    UserProfiles:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        username:
+          type: string
+          description: Required. 150 characters or fewer. Letters, digits and @/./+/-/_
+            only.
+          pattern: ^[\w.@+-]+$
+          maxLength: 150
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        first_name:
+          type: string
+          maxLength: 150
+        last_name:
+          type: string
+          maxLength: 150
+        image_path:
+          type: string
+          format: uri
+          nullable: true
+        points:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+        registration_date:
+          type: string
+          format: date-time
+          readOnly: true
+        recipes:
+          type: array
+          items:
+            $ref: '#/components/schemas/RecipeList'
+      required:
+      - email
+      - id
+      - recipes
+      - registration_date
+      - username
+  securitySchemes:
+    basicAuth:
+      type: http
+      scheme: basic
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: sessionid

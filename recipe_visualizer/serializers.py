@@ -182,3 +182,23 @@ class SignupSerializer(serializers.ModelSerializer):
         # Hash the password
         validated_data['password'] = make_password(validated_data['password'])
         return super().create(validated_data)
+
+class SearchByIngredientsSerializer(serializers.Serializer):
+    ingredients = serializers.ListField(child=serializers.CharField())
+    def validate(self, data):
+        if len(data['ingredients']) < 1:
+            raise serializers.ValidationError("Please select at least two ingredients.")
+        return data
+    
+class SearchByDescriptionSerializer(serializers.Serializer):    
+    description = serializers.CharField()
+    def validate(self, data):
+        if len(data['description']) < 1:
+            raise serializers.ValidationError("Please enter a description.")
+        return data
+    
+class UserProfilesSerializer(serializers.ModelSerializer):
+    recipes = RecipeListSerializer(many=True)
+    class Meta:
+        model = CustomUser
+        fields = ('id', 'username','email', 'first_name', 'last_name', 'image_path', 'points', 'registration_date', 'recipes')
