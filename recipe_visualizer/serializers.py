@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.hashers import make_password
-from .models import CustomUser, Category, IngredientCategory, Brand, Ingredient, Type, Recipe, RecipeType, Image, RecipeStep, StepImage, Search, Feedback, RecipeIngredient
+from .models import CustomUser, Category, IngredientCategory, Brand, Ingredient, Type, Recipe, RecipeType, Image, RecipeStep, StepImage, Search, Feedback, RecipeIngredient, Tag, RecipeTag
 
 class CustomUserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -65,10 +65,9 @@ class BrandSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class IngredientSerializer(serializers.ModelSerializer):
-    brand = BrandSerializer()
     class Meta:
         model = Ingredient
-        fields = ('id', 'name', 'description', 'brand')
+        fields = ('id', 'name')
 
 class TypeSerializer(serializers.ModelSerializer):
     class Meta:
@@ -96,7 +95,7 @@ class StepImageSerializer(serializers.ModelSerializer):
         fields = ('id', 'serial_no', 'image')
 
 class RecipeStepSerializer(serializers.ModelSerializer):
-    step_images = StepImageSerializer(many=True)
+    step_images = StepImageSerializer(many=True,required=False, allow_null=True)
     class Meta:
         model = RecipeStep
         fields = ('id', 'step_no', 'descriptions', 'step_images')
@@ -122,30 +121,54 @@ class RecipeIngredientSerializer(serializers.ModelSerializer):
     class Meta:
         model = RecipeIngredient
         fields = ('id', 'ingredient', 'quantity')
+class TagSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Tag
+        fields = '__all__'
+class RecipeTagSerializer(serializers.ModelSerializer):
+    tag = TagSerializer()
+    class Meta:
+        model = RecipeTag
+        fields = ('id', 'tag')
 
 class RecipeSerializer(serializers.ModelSerializer):
     user = CustomUserSerializer()
     feedback = FeedbackSerializer(many=True)
     ingredients = RecipeIngredientSerializer(many=True)
     steps = RecipeStepSerializer(many=True)
-    recipe_types = RecipeTypeSerializer(many=True)
-
+    tags = RecipeTagSerializer(many=True)
     class Meta:
         model = Recipe
-        fields = ('id', 'recipe_image', 'title', 'description', 'making_time', 'is_valid', 'is_feature', 'rating', 'user', 'feedback', 'ingredients', 'steps', 'recipe_types')
+        fields = ('id', 'recipe_image', 'title', 'description', 'making_time', 'rating', 'user', 'feedback', 'ingredients', 'steps', 'tags')
+
 class AddRecipeSerializer(serializers.ModelSerializer):
     ingredients = RecipeIngredientSerializer(many=True)
     steps = RecipeStepSerializer(many=True)
-    recipe_types = RecipeTypeSerializer(many=True)
-
+    tags = RecipeTagSerializer(many=True)
+    recipe_image = serializers.ImageField(required=False, allow_null=True)
     class Meta:
         model = Recipe
-        fields = ('id', 'recipe_image', 'title', 'description', 'making_time', 'ingredients', 'steps', 'recipe_types')
+        fields = ('id', 'recipe_image', 'title', 'description', 'making_time', 'ingredients', 'steps','tags')
 class RecipeListSerializer(serializers.ModelSerializer):
     user = CustomUserSerializer()
     class Meta:
         model = Recipe
-        fields = ('id', 'recipe_image', 'title', 'description', 'making_time', 'is_valid', 'is_feature', 'rating', 'user')
+        fields = ('id', 'recipe_image', 'title', 'description', 'making_time', 'rating', 'user')
+    def to_representation(self, instance):
+        # Get the current request context
+        request = self.context.get('request')
+        
+        # Generate the full image URL using request.build_absolute_uri
+        if instance.recipe_image:
+            image_url = request.build_absolute_uri(instance.recipe_image.url)
+        else:
+            image_url = None
+
+        # Serialize the instance with the updated image URL
+        representation = super(RecipeListSerializer, self).to_representation(instance)
+        representation['recipe_image'] = image_url
+        return representation
+
 class LoginSerializer(serializers.Serializer):
     username = serializers.CharField()
     password = serializers.CharField(write_only=True, required=True, style={'input_type': 'password'})  

@@ -37,7 +37,7 @@ class CustomUser(AbstractUser):
 
 class Category(models.Model):  # Category of Ingredient
     name = models.CharField(max_length=100)
-    details = models.TextField()
+    details = models.TextField(null=True, default=None)
 
     def __str__(self):
         return self.name
@@ -46,7 +46,7 @@ class Category(models.Model):  # Category of Ingredient
 
 class Brand(models.Model): # Brand of Ingredient
     name = models.CharField(max_length=100)
-    details = models.TextField()
+    details = models.TextField(null=True, default=None)
 
     def __str__(self):
         return self.name
@@ -54,7 +54,7 @@ class Brand(models.Model): # Brand of Ingredient
 class Ingredient(models.Model):
     brand = models.ForeignKey(Brand, on_delete=models.CASCADE, null=True, default=None)
     name = models.CharField(max_length=100)
-    description = models.TextField()
+    description = models.TextField(null=True, default=None)
 
     def __str__(self):
         return self.name
@@ -65,19 +65,19 @@ class IngredientCategory(models.Model):
 
 class Type(models.Model): # Type of Recipe
     name = models.CharField(max_length=100)
-    details = models.TextField()
+    details = models.TextField(null=True, default=None)
 
     def __str__(self):
         return self.name
 
 class Recipe(models.Model):
     user = models.ForeignKey(get_user_model(), on_delete=models.CASCADE, related_name='recipes')
-    recipe_image = models.ImageField(upload_to='recipe_images/',null=True)
+    recipe_image = models.ImageField(upload_to='recipe_images/',null=True, default=None)
     title = models.CharField(max_length=200)
     description = models.TextField()
     making_time = models.CharField(max_length=50)
     is_valid = models.BooleanField(default=True)
-    is_feature = models.BooleanField(default=True)
+    is_feature = models.BooleanField(default=False)
     rating = models.DecimalField(max_digits=3, decimal_places=2, default=0)
 
     def __str__(self):
@@ -89,7 +89,7 @@ class RecipeType(models.Model):
 
 class Image(models.Model): # Image of Recipe-Step
     image_path = models.ImageField(upload_to='recipe_step_images/')
-    descriptions = models.TextField()
+    descriptions = models.TextField(null=True, default=None)
 
 class RecipeStep(models.Model):
     recipe = models.ForeignKey(Recipe, on_delete=models.CASCADE, related_name='steps' )
@@ -116,4 +116,11 @@ class Feedback(models.Model):
 class RecipeIngredient(models.Model):
     recipe = models.ForeignKey(Recipe, on_delete=models.CASCADE, related_name='ingredients')
     ingredient = models.ForeignKey(Ingredient, on_delete=models.CASCADE)
-    quantity = models.CharField(max_length=50)
+    quantity = models.CharField(max_length=200)
+
+class Tag(models.Model):
+    name = models.CharField(max_length=200)
+
+class RecipeTag(models.Model):
+    recipe = models.ForeignKey(Recipe, on_delete=models.CASCADE, related_name='tags')
+    tag = models.ForeignKey(Tag, on_delete=models.CASCADE)

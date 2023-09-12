@@ -14,8 +14,6 @@ from django.utils import timezone
 from decimal import Decimal
 from rest_framework.exceptions import ValidationError
 from drf_spectacular.utils import extend_schema
-
-
 from .models import (
     CustomUser,
     Category,
@@ -31,6 +29,8 @@ from .models import (
     Search,
     Feedback,
     RecipeIngredient,
+    Tag,
+    RecipeTag,
 )
 from .serializers import (
     CustomUserSerializer,
@@ -58,6 +58,13 @@ from .serializers import (
     SearchByDescriptionSerializer,
     SearchByIngredientsSerializer,
 )
+import nltk
+from nltk.corpus import stopwords
+
+nltk.download('stopwords')
+
+# Define a list of stop words
+stop_words = set(stopwords.words('english'))
 
 class HomePageView(generics.ListAPIView):
     queryset = Recipe.objects.filter(is_feature=True)
@@ -157,7 +164,8 @@ class UserProfileView(generics.RetrieveAPIView):
         serializer = self.get_serializer(user)
 
         # Serialize user's added recipes
-        recipe_serializer = RecipeListSerializer(user_recipes, many=True)
+        recipe_serializer = RecipeListSerializer(user_recipes, many=True, context={'request': request})	
+
 
         # Create a response with both user data and user's added recipes
         response_data = serializer.data
@@ -238,110 +246,122 @@ class RecipeDetailsView(generics.RetrieveAPIView):
         return Response(serializer.data, status=status.HTTP_200_OK) 
 
 
-
 class AddRecipeView(generics.CreateAPIView):
     queryset = Recipe.objects.all()
     serializer_class = AddRecipeSerializer
     permission_classes = [IsAuthenticated]
 
-    def perform_create(self, serializer):
-        # Create the recipe
-        recipe = serializer.save(user=self.request.user)
-
-        # Process and save ingredients
-        ingredients_data = self.request.data.get('ingredients', [])
-        for ingredient_data in ingredients_data:
-            ingredient_name = ingredient_data.get('name')
-            ingredient, created = Ingredient.objects.get_or_create(name=ingredient_name)
-            quantity = ingredient_data.get('quantity')
-            RecipeIngredient.objects.create(recipe=recipe, ingredient=ingredient, quantity=quantity)
-
-        # Process and save recipe type
-        recipe_type_data = self.request.data.get('recipe_type', {})
-        type_name = recipe_type_data.get('name')
-        recipe_type, created = Type.objects.get_or_create(name=type_name)
-        RecipeType.objects.create(recipe=recipe, type=recipe_type)
-
-        # Process and save recipe steps along with images
-        steps_data = self.request.data.get('steps', [])
-        for step_data in steps_data:
-            step_serializer = RecipeStepSerializer(data=step_data)
-            if step_serializer.is_valid():
-                step = step_serializer.save(recipe=recipe)
-
-                # Process and save step images
-                step_images_data = step_data.get('step_images', [])
-                for image_data in step_images_data:
-                    image_serializer = ImageSerializer(data=image_data)
-                    if image_serializer.is_valid():
-                        image = image_serializer.save()
-                        step_image = StepImage(step=step, image=image)
-                        step_image.save()
-
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         if serializer.is_valid():
-            self.perform_create(serializer)
+            # Create a new recipe instance
+            recipe_image = serializer.validated_data.get('recipe_image')
+            if recipe_image:
+                recipe = Recipe.objects.create(
+                    title=serializer.validated_data['title'],
+                    description=serializer.validated_data['description'],
+                    making_time=serializer.validated_data['making_time'],
+                    recipe_image=recipe_image,
+                    user=request.user  # Set the user to the authenticated user
+                )
+            else:
+                recipe = Recipe.objects.create(
+                    title=serializer.validated_data['title'],
+                    description=serializer.validated_data['description'],
+                    making_time=serializer.validated_data['making_time'],
+                    user=request.user  # Set the user to the authenticated user
+                )
+            print(recipe)
+            # Process and save ingredients
+            ingredients_data = serializer.validated_data.get('ingredients', [])
+            print(ingredients_data)
+            for ingredient_data in ingredients_data:
+                ingredient_name = ingredient_data.get('ingredient', {}).get('name')
+                ingredient, created = Ingredient.objects.get_or_create(name=ingredient_name)
+                quantity = ingredient_data.get('quantity')
+                RecipeIngredient.objects.create(recipe=recipe, ingredient=ingredient, quantity=quantity+" "+ingredient_name)
+
+            # Process and save tags
+            tags_data = serializer.validated_data.get('tags', [])
+            print(tags_data)
+            for tag_data in tags_data:
+                tag_name = tag_data.get('tag', {}).get('name')
+                tag, created = Tag.objects.get_or_create(name=tag_name)
+                RecipeTag.objects.create(recipe=recipe, tag=tag)
+
+            # Process and save steps along with images
+            steps_data = serializer.validated_data.get('steps', [])
+            print(steps_data)
+            for step_data in steps_data:
+                step = RecipeStep.objects.create(
+                    recipe=recipe,
+                    step_no=step_data.get('step_no'),
+                    descriptions=step_data.get('descriptions')
+                )
+                if step_data.get('step_images'):
+                    step_images_data = step_data.get('step_images', [])
+                    for image_data in step_images_data:
+                        image = Image.objects.create(
+                            image_path=image_data.get('image', {}).get('image_path'),
+                            descriptions=image_data.get('image', {}).get('descriptions')
+                        )
+                        StepImage.objects.create(step=step, image=image)
+
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-@extend_schema(request=SearchByIngredientsSerializer,responses=RecipeListSerializer)
-class SearchByIngredientsView(generics.ListAPIView):
-    serializer_class = RecipeListSerializer
 
-    def get_queryset(self):
-        print(self.request.data)
-        ingredient_names = self.request.data["ingredients"]
-        print(ingredient_names)
-        queryset = Recipe.objects.filter(is_valid=True)
+class SearchByIngredientsView(generics.GenericAPIView):
+    serializer_class = SearchByIngredientsSerializer
+    queryset = Recipe.objects.all()   
+    def post(self, request, *args, **kwargs):
+        serializer = SearchByIngredientsSerializer(data=request.data)
+        if serializer.is_valid():
+            print(self.request.data)
+            ingredient_names = serializer.validated_data["ingredients"]
+            print(ingredient_names)
+            queryset = Recipe.objects.filter(is_valid=True)
 
-        for ingredient in ingredient_names:
-            queryset = queryset.filter(
-                Q(ingredients__ingredient__name__icontains=ingredient) |
-                Q(ingredients__ingredient__description__icontains=ingredient)
+            for ingredient in ingredient_names:
+                queryset = queryset.filter(
+                    Q(ingredients__ingredient__name__icontains=ingredient) |
+                    Q(ingredients__ingredient__description__icontains=ingredient)
+                )
+            queryset = queryset.order_by('-id').distinct()
+            recipe_serializer = RecipeListSerializer(queryset, many=True, context={'request': request})
+            return Response(recipe_serializer.data, status=status.HTTP_200_OK)
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class SearchByDescriptionView(generics.GenericAPIView):
+    serializer_class = SearchByDescriptionSerializer
+    queryset = Recipe.objects.all()   
+    def post(self, request, *args, **kwargs):
+        serializer = SearchByDescriptionSerializer(data=request.data)
+        if serializer.is_valid():
+            description = serializer.validated_data['description']
+            print(description)
+            
+            # Tokenize the search query and remove stop words
+            keywords = [word for word in description.split() if word.lower() not in stop_words]
+            
+            queryset = Recipe.objects.filter(
+                is_valid=True,
+                description__isnull=False,
             )
-        return queryset.distinct()
-
-    def list(self, request, *args, **kwargs):
-        queryset = self.get_queryset()
-        serializer = self.get_serializer(queryset, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
-    def post(self, request, *args, **kwargs):
-        return self.list(request, *args, **kwargs)
-
-@extend_schema(request=SearchByDescriptionSerializer,responses=RecipeListSerializer)
-class SearchByDescriptionView(generics.ListAPIView):
-    serializer_class = RecipeListSerializer
-
-    def get_queryset(self):
-        description = self.request.data['description']
-        print(description)
-        # Filter recipes based on a similarity threshold
-        queryset = Recipe.objects.filter(
-            is_valid=True,
-            description__isnull=False,
-        ).filter(
-            Q(title__icontains=description) |
-            Q(description__icontains=description) |
-            Q(description__isnull=False, description__icontains=description)
-        ).order_by('-id')
-        print(queryset)
-        # Use fuzzywuzzy's fuzz.partial_ratio to compare descriptions
-        # matching_recipes = []
-        # for recipe in queryset:
-        #     similarity = fuzz.partial_ratio(description.lower(), recipe.description.lower())
-        #     # You can adjust the threshold (e.g., 80) as needed
-        #     if similarity >= 60:
-        #         matching_recipes.append(recipe)
-
-        return queryset.distinct()
-
-    def list(self, request, *args, **kwargs):
-        queryset = self.get_queryset()
-        serializer = self.get_serializer(queryset, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
-    def post(self, request, *args, **kwargs):
-        return self.list(request, *args, **kwargs)
+            for keyword in keywords:
+                queryset = queryset.filter(
+                    Q(title__icontains=keyword) |
+                    Q(description__icontains=keyword) |
+                    Q(tags__tag__name__icontains=keyword) |
+                    Q(steps__descriptions__icontains=keyword)
+                )
+            queryset = queryset.order_by('-id').distinct()
+        
+            recipe_serializer = RecipeListSerializer(queryset, many=True, context={'request': request})
+            return Response(recipe_serializer.data, status=status.HTTP_200_OK)
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class GiveFeedbackView(generics.CreateAPIView):
     serializer_class = CreateFeedbackSerializer
@@ -381,63 +401,68 @@ class GiveFeedbackView(generics.CreateAPIView):
         )
     
 
+
 class UpdateRecipeView(generics.UpdateAPIView):
     queryset = Recipe.objects.all()
-    serializer_class = AddRecipeSerializer  # Use the AddRecipeSerializer for updates
+    serializer_class = AddRecipeSerializer  # Use the AddRecipeSerializer for update
     permission_classes = [IsAuthenticated]
 
     def update(self, request, *args, **kwargs):
-        instance = self.get_object()
+        recipe = self.get_object()
+        serializer = self.get_serializer(recipe, data=request.data, partial=True)
 
-        # Check if the user updating the recipe is the owner
-        if instance.user != request.user:
-            return Response({
-                'status': 'error',
-                'message': 'You do not have permission to edit this recipe.'
-            }, status=status.HTTP_403_FORBIDDEN)
-
-        serializer = self.get_serializer(instance, data=request.data, partial=True)
         if serializer.is_valid():
-            # Handle updating related ingredients
-            ingredients_data = request.data.get('ingredients', [])
+            # Update the recipe instance
+            recipe.title = serializer.validated_data.get('title', recipe.title)
+            recipe.description = serializer.validated_data.get('description', recipe.description)
+            recipe.making_time = serializer.validated_data.get('making_time', recipe.making_time)
+            
+            # Update the recipe image if provided
+            recipe_image = serializer.validated_data.get('recipe_image')
+            if recipe_image:
+                recipe.recipe_image = recipe_image
+            
+            recipe.save()
+
+            # Process and update ingredients
+            ingredients_data = serializer.validated_data.get('ingredients', [])
+            RecipeIngredient.objects.filter(recipe=recipe).delete()  # Remove existing steps
             for ingredient_data in ingredients_data:
-                ingredient_name = ingredient_data.get('name')
+                ingredient_name = ingredient_data.get('ingredient', {}).get('name')
                 ingredient, created = Ingredient.objects.get_or_create(name=ingredient_name)
                 quantity = ingredient_data.get('quantity')
-                RecipeIngredient.objects.update_or_create(
-                    recipe=instance,
-                    ingredient=ingredient,
-                    defaults={'quantity': quantity}
-                )
+                RecipeIngredient.objects.create(recipe=recipe, ingredient=ingredient, quantity=quantity)
 
-            # Handle updating the recipe type
-            recipe_type_data = request.data.get('recipe_type', {})
-            type_name = recipe_type_data.get('name')
-            recipe_type, created = Type.objects.get_or_create(name=type_name)
-            instance.recipe_types.set([recipe_type])
+            # Process and update tags
+            tags_data = serializer.validated_data.get('tags', [])
+            RecipeTag.objects.filter(recipe=recipe).delete()  # Remove existing tags
 
-            # Handle updating recipe steps along with images
-            steps_data = request.data.get('steps', [])
+            for tag_data in tags_data:
+                tag_name = tag_data.get('tag', {}).get('name')
+                tag, created = Tag.objects.get_or_create(name=tag_name)
+                RecipeTag.objects.create(recipe=recipe, tag=tag)
+
+            # Process and update steps along with images
+            steps_data = serializer.validated_data.get('steps', [])
+            RecipeStep.objects.filter(recipe=recipe).delete()  # Remove existing steps
             for step_data in steps_data:
-                step_serializer = RecipeStepSerializer(data=step_data)
-                if step_serializer.is_valid():
-                    step = step_serializer.save(recipe=instance)
-
-                    # Handle updating step images
+                step = RecipeStep.objects.create(
+                    recipe=recipe,
+                    step_no=step_data.get('step_no'),
+                    descriptions=step_data.get('descriptions')
+                )
+                if step_data.get('step_images'):
                     step_images_data = step_data.get('step_images', [])
                     for image_data in step_images_data:
-                        image_serializer = ImageSerializer(data=image_data)
-                        if image_serializer.is_valid():
-                            image = image_serializer.save()
-                            StepImage.objects.update_or_create(
-                                step=step,
-                                image=image,
-                                defaults={'serial_no': image_data.get('serial_no')}
-                            )
+                        image = Image.objects.create(
+                            image_path=image_data.get('image', {}).get('image_path'),
+                            descriptions=image_data.get('image', {}).get('descriptions')
+                        )
+                        StepImage.objects.create(step=step, image=image)
 
-            self.perform_update(serializer)
             return Response(serializer.data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 
     
@@ -461,3 +486,11 @@ class RecipeDeleteView(generics.DestroyAPIView):
             'status': 'success',
             'message': 'Recipe deleted successfully.'
         }, status=status.HTTP_204_NO_CONTENT)
+    
+class IngredientListView(generics.ListAPIView):	
+    queryset = Ingredient.objects.all()	
+    serializer_class = IngredientSerializer	
+    def list(self, request, *args, **kwargs):	
+        queryset = self.get_queryset()	
+        serializer = self.get_serializer(queryset, many=True)	
+        return Response(serializer.data)

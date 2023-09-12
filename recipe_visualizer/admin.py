@@ -14,6 +14,8 @@ from .models import (
     Search,
     Feedback,
     RecipeIngredient,
+    Tag,
+    RecipeTag
 )
 
 # Register your models here.
@@ -31,3 +33,5 @@ admin.site.register(StepImage)
 admin.site.register(Search)
 admin.site.register(Feedback)
 admin.site.register(RecipeIngredient)
+admin.site.register(Tag)
+admin.site.register(RecipeTag)
